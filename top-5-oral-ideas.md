@@ -1,6 +1,19 @@
 # Top 5 Oral-Level Ideas for NeurIPS 2026
 
-*Cycle 3 output. Each idea verified novel against 20-75+ papers. Ranked by oral potential.*
+*Cycle 3 output, updated with DreamZero/Cosmos/MolmoBot landscape analysis. Each idea verified novel against 20-75+ papers. Ranked by oral potential.*
+
+## Landscape Context (Critical)
+
+The field as of March 2026 is dominated by:
+- **DreamZero** (NVIDIA, 2602.15922): 14B World Action Model, >2× SOTA VLAs, open-sourced
+- **DreamDojo** (NVIDIA, 2602.06949): 44K hrs human video pretraining, open-sourced
+- **Cosmos Policy** (NVIDIA, 2601.16163): world foundation model as manipulation policy
+- **Dreamer 4** (DeepMind, 2509.24527): 2B world model, Nature publication
+- **V-JEPA 2** (Meta, 2506.09985): non-generative world model, 62 hrs robot data for zero-shot MPC
+- **MolmoBot** (AI2, 2603.16861): pure sim training matches π0, fully open-source
+- **π*0.6** (Physical Intelligence, 2511.14759): VLA self-improvement via RL
+
+**Our 5 ideas operate at a different abstraction level** — representations, pre-training paradigms, data efficiency, interpretability, and curricula — that is complementary to these systems, not competing with them. DynaCLIP could improve DreamZero's backbone. PhysSAE could analyze DreamZero's internals. Zero-Success could train DreamZero without demonstrations.
 
 ---
 
