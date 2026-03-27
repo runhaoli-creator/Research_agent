@@ -1,26 +1,28 @@
 # Research_agent — Status
 
-## Current Phase: Ideation → Implementation
+## Current Phase: Ideation Complete → Ready for Implementation
 
-## Selected Idea: PhysLang
-Language-grounded world models conditioned on physical property descriptions for zero-shot dynamics generalization in robot manipulation. Targeting NeurIPS 2026.
+## Selected Idea: DynaCLIP (Cycle 2 winner, replaces PhysLang)
+Physics-grounded visual representations via contrastive dynamics alignment. "CLIP aligned vision with language. DynaCLIP aligns vision with physics." Targeting NeurIPS 2026.
 
 ## Research Question
-Can conditioning a world model on natural language descriptions of physical properties (mass, friction, elasticity) enable zero-shot generalization to novel physical property combinations in manipulation?
+Can visual representations aligned with physical dynamics similarity (instead of semantic/visual similarity) dramatically improve physics-aware manipulation and enable zero-shot physical property inference?
 
 ## Key Milestones
-- [x] Literature review (50+ papers surveyed)
-- [x] Idea formulation (8 ideas generated, top 3 with extended abstracts)
-- [x] Novelty verification (all 3 top ideas confirmed novel via web search)
-- [ ] Prototype implementation
-- [ ] Data generation (ManiSkill3, 500K trajectories)
-- [ ] PhysLang model training
-- [ ] Baseline experiments (DreamerV3, TD-MPC2, AdaptiGraph, vision-only, oracle)
+- [x] Literature review (70+ papers surveyed across 2 cycles)
+- [x] Idea generation Cycle 1 (8 ideas, all poster-level)
+- [x] Brutal self-critique + novelty verification (6 ideas checked against 100+ papers)
+- [x] Idea generation Cycle 2 (2 new ideas, DynaCLIP reaches oral potential)
+- [x] Implementation spec written (comprehensive coding agent prompt)
+- [ ] Data generation (ManiSkill3, 500K images + dynamics fingerprints)
+- [ ] DynaCLIP pre-training (contrastive learning, 100K steps)
+- [ ] Core evaluation (probing, invisible physics test, zero-shot)
+- [ ] Downstream experiments (world model, diffusion policy, LIBERO, CALVIN)
 - [ ] Ablation studies (8 ablations)
-- [ ] Analysis (t-SNE, sensitivity, failure cases)
+- [ ] Analysis (t-SNE, sensitivity, cross-domain transfer)
 - [ ] Paper writing
-- [ ] Submission
 
 ## Decisions
-- **2026-03-27:** Selected PhysLang over WorldSearch (inference-time scaling) and CounterFact (counterfactual trajectories) due to strongest novelty moat. WorldSearch risks being scooped by Stanford Pavone lab (RoboMonkey/CoVer line).
-- **2026-03-27:** ManiSkill3 chosen as primary simulator (GPU-parallelized, programmable physics). Isaac Lab as secondary for photorealistic rendering ablation.
+- **2026-03-27 (Cycle 1):** Initially selected PhysLang. After brutal self-critique, recognized it as poster-level due to Oracle baseline problem.
+- **2026-03-27 (Cycle 2):** Selected DynaCLIP over PhysLang, WorldSearch, CounterFact, and Zero-Success Learning. DynaCLIP has strongest novelty moat (confirmed novel against 25+ representation learning papers), cleanest narrative ("CLIP for physics"), and highest oral potential (8/10).
+- **Why DynaCLIP > PhysLang:** PhysLang conditions a world model on language descriptions of physics — but "why not just use the numbers?" is a devastating critique. DynaCLIP learns physics-grounded REPRESENTATIONS that benefit ALL downstream tasks, and the invisible physics test is a killer experiment.

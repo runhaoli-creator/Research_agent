@@ -371,8 +371,156 @@ Training: Standard prediction loss per head + weighted sum of consistency losses
 | 7 | SlotDyn (Object-Centric Diffusion) | 47/60 | **Borderline** — known ingredients, novelty in combination |
 | 8 | GrainWorld (Multi-Granularity) | 45/60 | **Weak** — engineering-heavy, may lack crisp insight |
 
-### Honest Assessment
+### Honest Assessment (Cycle 1)
 
-- **Ideas 1-2** have the strongest narratives. Idea 1 ("inference-time scaling for robotics") is the clearest NeurIPS contribution because it's a fundamental result about scaling laws. Idea 2 is the most creative — nobody has thought to use language as a physics interface for world models.
-- **Ideas 3-4** are solid contributions but depend heavily on execution quality.
-- **Ideas 5-8** risk being seen as incremental: combining known techniques (differentiable physics + world models, active learning + world models, slot attention + diffusion, multi-task learning with consistency losses). They need very strong results to overcome the "just combining A and B" critique.
+- **Ideas 1-2** have the strongest narratives but after brutal self-critique and novelty verification, NONE reach oral level.
+- **All 8 ideas are "combine A with B in domain C"** — poster/spotlight territory, not oral.
+- See Cycle 2 below for strictly better ideas.
+
+---
+---
+
+## Cycle 2: Iteration After Brutal Self-Critique + Additional Literature Search
+
+*After finding 27 additional March 2026 papers, verifying novelty of 6 ideas against 100+ papers, and identifying fundamental weaknesses in all Cycle 1 ideas.*
+
+### Why Cycle 1 Failed
+
+Every Cycle 1 idea was a **recombination** of known techniques. The strongest rejection for each:
+- WorldSearch: "MPC + scaling curves. We knew this from AlphaGo."
+- PhysLang: "Why language instead of numerical parameters? Oracle baseline crushes you."
+- CounterFact: "This is MBPO + gradient saliency. Rebranding isn't novelty."
+
+Oral papers need one of: (1) a **new paradigm**, (2) a **surprising discovery**, (3) a **shockingly good result**.
+
+---
+
+## Idea 9: DynaCLIP — Contrastive Dynamics-Vision Alignment ★★★★★
+
+**Title:** *DynaCLIP: Physics-Grounded Visual Representations via Contrastive Dynamics Alignment*
+
+**One-line pitch:** CLIP aligned vision with language. DynaCLIP aligns vision with physics — objects that behave the same physically get similar representations, regardless of appearance.
+
+**Motivation:** Every visual backbone used in robotics today (DINOv2, CLIP, SigLIP, R3M, VIP) aligns representations with the WRONG similarity metric for manipulation. DINOv2 groups by visual similarity. CLIP groups by semantic meaning. R3M groups by temporal co-occurrence. VIP groups by value. But for manipulation, what matters is PHYSICAL DYNAMICS — how objects respond to forces, contacts, and interactions. A ceramic mug and a plastic mug look identical (same DINOv2 embedding) but one shatters when dropped. A steel ball and an apple look completely different but roll the same way. Current representations cannot distinguish the first pair or recognize the similarity of the second.
+
+**Key insight:** The contrastive similarity metric should be DYNAMICS SIMILARITY, not visual, semantic, or temporal similarity. Two observations are "similar" if the physical systems in those observations respond similarly to the same actions (same resulting trajectories, forces, contacts). This requires simulation to generate the contrastive pairs — but simulation data is free and unlimited.
+
+**Novelty verification (exhaustive search, 25+ papers checked):**
+- MCR (ICLR 2025): aligns vision with co-occurring proprioception → temporal coincidence, NOT dynamics similarity
+- CLASS (CoRL 2025): contrastive pairs by action-sequence DTW → behavioral, NOT physical dynamics
+- PSE (ICLR 2021 Spotlight): policy similarity → NOT physics
+- DynaMo, R3M, VIP, AFRO, CLOUD: all use different alignment signals (prediction, time, value)
+- **NO existing paper uses physics dynamics similarity as the contrastive metric.** Gap confirmed.
+
+**Method sketch:**
+1. **Dynamics similarity metric:** In simulation, apply K standardized test actions to each object/scene. Record resulting trajectories (positions, velocities over 50 timesteps). Dynamics similarity = negative DTW distance between trajectory pairs. Objects with similar mass, friction, and shape produce similar trajectories → high dynamics similarity.
+
+2. **Contrastive pre-training:** Visual encoder (DINOv2 backbone, fine-tuned) learns embeddings where dynamics-similar observations are close and dynamics-dissimilar observations are far. Use InfoNCE with dynamics-similarity-weighted soft labels (not binary positive/negative, but continuous similarity scores). The key design: positive pairs are visually DIFFERENT but dynamically SIMILAR (different textures, same physics). Hard negatives are visually SIMILAR but dynamically DIFFERENT (same appearance, different mass/friction).
+
+3. **Pre-training data generation:** In ManiSkill3/Isaac Lab, generate 1M+ (image, dynamics_trajectory) pairs across 100+ object types × 50+ physical property configurations × 20 viewpoints. Programmatically vary mass (0.05–10kg), friction (0.05–1.5), restitution (0–0.95), density, damping. Apply 5 standardized test actions per configuration: push-left, push-right, push-forward, lift-and-drop, poke.
+
+4. **Architecture:** DINOv2-ViT-B/14 backbone (86M params) with a lightweight projection head (2-layer MLP, 512d) trained with contrastive loss. The backbone weights are fine-tuned during pre-training (not frozen) to reshape the feature space for dynamics similarity. Total trainable: ~90M params.
+
+**The Killer Experiments:**
+
+*Experiment 1 — The Invisible Physics Test:*
+Create pairs of visually IDENTICAL objects (same mesh, texture, color) with DIFFERENT physical properties (one is 10× heavier, or one has 10× lower friction). All existing visual encoders produce IDENTICAL embeddings for these pairs. DynaCLIP produces DIFFERENT embeddings. Show that policies using DynaCLIP handle these objects correctly (gentle grasp for heavy object, firm grasp for slippery object) while policies using DINOv2 fail.
+
+*Experiment 2 — Physics Property Probing:*
+Linear probing of learned representations for physical property prediction (mass regression, friction regression, material classification). Compare DynaCLIP, DINOv2, CLIP, SigLIP, R3M, VIP, MCR. DynaCLIP should achieve dramatically higher probing accuracy — its representations ENCODE physics.
+
+*Experiment 3 — Downstream World Model:*
+Use each representation as the visual backbone for a Dreamer-style world model. Train on LIBERO + physics-varying tasks. DynaCLIP backbone should produce world models with lower prediction error (especially for long horizons and contact-rich tasks) because its representations capture dynamics-relevant features.
+
+*Experiment 4 — Downstream Policy Learning:*
+Use each representation as the visual backbone for diffusion policy. Train on same demonstrations, compare success rates. DynaCLIP should improve data efficiency (reach same performance with fewer demos) because physics-relevant features are pre-trained.
+
+*Experiment 5 — Zero-Shot Physics Inference:*
+Given a novel object image, predict its physical properties from the DynaCLIP embedding (via k-NN in embedding space over a library of known objects). No existing encoder can do this because their embeddings don't correlate with physics.
+
+**Expected experiments (hardware):**
+- **Simulator/Dataset:** ManiSkill3 (data generation), LIBERO (standard benchmark), CALVIN (long-horizon), custom physics-varying benchmark
+- **Backbones compared:** DynaCLIP, DINOv2-B, DINOv2-L, SigLIP-B, CLIP-L, R3M, VIP, MCR
+- **GPU hours (PoC):** ~500 H200-hours. Data generation: 50h. Contrastive pre-training: 200h. Probing + evaluation: 250h.
+- **Node allocation:**
+  - Nodes 1-2: ManiSkill3 data generation (1000+ parallel envs per GPU)
+  - Node 3: DynaCLIP contrastive pre-training (8×H200 DDP)
+  - Node 4: Baseline representation training (R3M, MCR, VIP fine-tuning)
+  - Node 5: Downstream evaluation (world model + policy learning)
+  - Node 6: Probing + invisible physics test + zero-shot inference
+
+**Why it's NeurIPS-worthy (oral argument):**
+1. **New paradigm.** Dynamics-aligned representations are a fundamentally different approach to visual representation learning for robotics — not an incremental improvement on an existing approach.
+2. **Broad applicability.** DynaCLIP is a pre-trained backbone, not a task-specific method. It benefits world models, policies, physics inference — any downstream task.
+3. **Clean narrative.** "CLIP aligned vision with language. We align vision with physics." One sentence, immediately understood.
+4. **Memorable demo.** The invisible physics test is the kind of result reviewers talk about at the poster session.
+5. **Connects to cognitive science.** Humans develop physics understanding in infancy (Spelke, 1990). DynaCLIP is the computational analog.
+
+**Risks:**
+- Dynamics-aligned representations might not transfer well to standard benchmarks where physics variation is minimal (DINOv2 already works well on LIBERO). **Mitigation:** Create custom physics-varying benchmark alongside standard ones.
+- The contrastive pre-training might not scale — dynamics similarity is expensive to compute (requires simulation). **Mitigation:** Pre-compute all dynamics trajectories offline; the contrastive training itself is standard.
+- A reviewer might argue: "Just add a dynamics prediction head to DINOv2 during fine-tuning." **Mitigation:** DynaCLIP learns dynamics STRUCTURE in the embedding space (nearby = similar dynamics), not just prediction capability. The structure benefits any downstream model that uses the embeddings.
+
+---
+
+## Idea 10: Zero-Success Learning — Manipulation from Failures Alone ★★★★
+
+**Title:** *Zero-Success Learning: Robot Manipulation from Failure Data Alone via World Model Imagination*
+
+**One-line pitch:** A robot learns to succeed at manipulation tasks using ZERO successful demonstrations — only failures. The world model learns dynamics from failures, identifies near-success states, and imagines corrective actions to synthesize success.
+
+**Motivation:** Successful demonstrations require skilled teleoperators and cost $50-100/hour. Failed demonstrations are essentially free — even a random policy generates them. If we could extract the same learning signal from failures as from successes, it would democratize robot learning. The key insight: failed trajectories contain ALL the dynamics information (objects move, contacts happen, physics applies). The only difference between failure and success is often a few critical actions near task completion.
+
+**Novelty verification:**
+- Grollman & Billard (2011): tried failure-only in low-dimensional settings, acknowledged insufficiency in high dimensions
+- No paper combines failure-only data + world model imagination for manipulation
+- HER relabels goals but requires online RL
+- CQL can stitch from zero-success data in navigation, not manipulation
+- **Gap confirmed.**
+
+**Method sketch:**
+1. **Failure data collection:** Random policy + scripted exploration in simulation. Collect 10K trajectories per task, all failures.
+2. **World model training:** Train latent dynamics model on failure trajectories. The model learns: how objects move when pushed/grasped, friction, mass, robot kinematics — all present in failures.
+3. **Near-success identification:** Train a goal-proximity function g(s) that estimates how close state s is to task completion. Use visual similarity to goal images + learned progress metrics.
+4. **Imagination-based completion:** From near-success states (g(s) > threshold), use the world model + CEM planning to find action sequences that complete the task. The search space is small because we start near success.
+5. **Synthetic demonstration synthesis:** Stitch: (failure trajectory up to near-success state) + (world model imagined completion) = full synthetic successful trajectory.
+6. **Policy training:** Train policy on synthetic successful trajectories via standard IL.
+
+**Self-evaluation:**
+| Dimension | Score |
+|-----------|:---:|
+| Novelty | 9 |
+| Significance | 9 |
+| Feasibility | 6 |
+| Technical depth | 7 |
+| Clarity | 10 |
+| Sim-only | 10 |
+| **TOTAL** | **51/60** |
+
+**Risk assessment:** HIGH. The core risk is that world models trained only on failure data may not have enough coverage of success-state dynamics. If the world model can't accurately predict what happens NEAR success (because it's never seen success), the imagined completions will be wrong. However, for many tasks (pushing, pick-and-place), near-success states physically resemble failure states (the object is in a similar position, just slightly off-target), so the dynamics should transfer.
+
+---
+
+## Updated Rankings (Cycle 1 + Cycle 2)
+
+| Rank | Idea | Score | Cycle | Oral Potential |
+|------|------|-------|-------|:---:|
+| **1** | **DynaCLIP** (Dynamics-Vision Alignment) | **55/60** | 2 | **8/10** |
+| 2 | Zero-Success Learning | 51/60 | 2 | 7/10 (if works) |
+| 3 | WorldSearch (Inference Scaling) | 56/60* | 1 | 5/10 |
+| 4 | PhysLang (Language Physics) | 52/60* | 1 | 5/10 |
+| 5 | CounterFact (Counterfactual) | 50/60* | 1 | 4/10 |
+
+*Cycle 1 scores were inflated. After brutal self-critique, effective oral potential is much lower than raw scores suggest. DynaCLIP's 55/60 on a more honest rubric beats Cycle 1's inflated 56/60.*
+
+### Final Recommendation
+
+**DynaCLIP is the idea to pursue.** It has:
+- Confirmed novelty (no prior work in 25+ papers checked)
+- A clean, memorable narrative ("CLIP for physics")
+- A killer experiment (invisible physics test)
+- Broad applicability (backbone, not task-specific method)
+- Feasible execution (contrastive learning is well-understood)
+- Genuine oral potential (new paradigm, not recombination)
+
+Zero-Success Learning is the high-risk backup — if DynaCLIP results are underwhelming, pivot to this. The two can even be combined: DynaCLIP representations could enable Zero-Success Learning by providing physics-aware features that help the world model learn from failure data.
