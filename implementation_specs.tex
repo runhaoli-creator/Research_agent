@@ -1,470 +1,80 @@
 \documentclass[11pt,a4paper]{article}
-\usepackage[margin=1in]{geometry}
-\usepackage{amsmath,amssymb}
-\usepackage{booktabs}
-\usepackage{listings}
-\usepackage{xcolor}
+\usepackage[margin=0.9in]{geometry}
 \usepackage{hyperref}
 \usepackage{enumitem}
-\usepackage{multirow}
-\usepackage{longtable}
-\usepackage{fancyhdr}
 
-\definecolor{codegreen}{rgb}{0,0.6,0}
-\definecolor{codegray}{rgb}{0.5,0.5,0.5}
-\definecolor{codepurple}{rgb}{0.58,0,0.82}
-\definecolor{backcolour}{rgb}{0.95,0.95,0.95}
-
-\lstdefinestyle{pythonstyle}{
-    backgroundcolor=\color{backcolour},
-    commentstyle=\color{codegreen},
-    keywordstyle=\color{codepurple},
-    numberstyle=\tiny\color{codegray},
-    stringstyle=\color{codegreen},
-    basicstyle=\ttfamily\footnotesize,
-    breaklines=true,
-    frame=single,
-    numbers=left,
-    numbersep=5pt,
-    showstringspaces=false
-}
-\lstset{style=pythonstyle}
-
-\pagestyle{fancy}
-\fancyhead[L]{\leftmark}
-\fancyhead[R]{NeurIPS 2026 Implementation Specs}
-
-\title{\textbf{Top 5 Oral-Level Research Ideas for NeurIPS 2026}\\[5pt]
-\large World Models for Robotic Manipulation\\[10pt]
-\normalsize Complete Implementation Specifications for Coding Agents\\
-\normalsize All Sim-Only --- No Real Robot Required}
-\author{Research Ideation Agent\\
-\small Verified against 200+ papers across 4 iteration cycles}
-\date{March 2026}
+\title{\textbf{5 Research Implementation Prompts for Coding Agents}\\[5pt]
+\large Each section is a self-contained prompt. Copy any one section and give it directly to your coding agent to implement the full project end-to-end.}
+\author{}
+\date{}
 
 \begin{document}
 \maketitle
-\tableofcontents
-\newpage
 
 %=====================================================================
-\section{Landscape Context}
+\section{Idea \#1: DynaCLIP}
 %=====================================================================
 
-The field as of March 2026 is dominated by large-scale systems:
-\begin{itemize}[nosep]
-\item \textbf{DreamZero} (NVIDIA, 14B WAM, 2602.15922) --- joint video+action prediction, $>2\times$ SOTA VLAs, open-sourced
-\item \textbf{Physics-IQ} (DeepMind, 2501.09038) --- definitive proof video models CANNOT learn physics (best: 24.1\%)
-\item \textbf{PhysiX} (4.5B, 2506.17774), \textbf{Walrus} (1.3B, 2511.15684), \textbf{GPhyT} (1.8TB, 2509.13805) --- physics FMs, NOT connected to manipulation
-\item \textbf{DALI} (NeurIPS 2025, 2508.20294) --- context-conditioned WM adaptation without gradients on MetaWorld
-\item \textbf{Cosmos Policy} (NVIDIA, 2601.16163) --- world foundation model as manipulation policy
-\item \textbf{MolmoBot} (AI2, 2603.16861) --- pure sim training matches $\pi_0$
-\end{itemize}
+Build a project called DynaCLIP that learns physics-grounded visual representations for robotic manipulation via contrastive learning where the similarity metric is physical dynamics similarity, not visual or semantic similarity. This idea has been verified novel against 25+ representation learning papers including MCR (ICLR 2025), CLASS (CoRL 2025), PSE (ICLR 2021), DynaMo, R3M, VIP, AFRO, and CLOUD --- none of which use dynamics similarity as the contrastive signal. The core insight is that current robotics backbones like DINOv2, CLIP, and SigLIP encode what objects look like, not how they behave physically, and Physics-IQ (DeepMind, arXiv 2501.09038) proves that video models score only 24.1\% on physical understanding.
 
-\noindent\textbf{Fundamental tension:} DreamZero/Cosmos are engineering marvels but Physics-IQ proves video models score only 24.1\% on physics. Our 5 ideas target physics-grounded capabilities these systems lack.
+For data generation, use ManiSkill3 (install via pip install mani-skill) which is GPU-parallelized and supports programmatic physics property variation through the SAPIEN API (actor.set\_mass(), material.set\_static\_friction(), material.set\_restitution()). Create 50 distinct object geometries from YCB and ShapeNet with 5 texture variants each, giving 250 visual variants. For each geometry, sample 100 random physical property configurations: mass log-uniform in [0.05, 10.0] kg, static friction uniform in [0.05, 1.5], restitution uniform in [0.0, 0.95], dynamic friction = 0.8 times static. This gives 5,000 object-property configurations total. For each configuration, execute 5 standardized diagnostic actions using a Franka Panda arm --- push along +X at 0.05 m/s for 1 second, push along +Y, grasp then lift 20cm then release, quick lateral flick at object edge, and slow press downward --- recording the resulting object trajectories (3D position, quaternion orientation, 3D linear velocity, 3D angular velocity = 13 dimensions) for 50 timesteps at 20Hz. The dynamics fingerprint for each configuration is the concatenation of all 5 trajectory recordings. Compute pairwise dynamics similarity as the negative average DTW distance (use tslearn.metrics.dtw) across the 5 test actions, normalized to [0,1]. Render 20 RGB images at 224x224 per configuration from varied viewpoints (azimuth 0-360, elevation 15-45 degrees, distance 0.4-0.8m) in 5 different object poses, giving 100,000 total images. Pre-compute DINOv2 embeddings for all images and mine pairs: 30\% hard negatives (DINOv2 cosine similarity above 0.9 but dynamics similarity below 0.3), 30\% hard positives (DINOv2 cosine similarity below 0.5 but dynamics similarity above 0.7), and 40\% random. Also create an Invisible Physics test set of 500 image pairs where the objects use the same mesh, same texture, and same viewpoint (so they are visually identical with DINOv2 cosine similarity above 0.99) but have different physical properties.
 
-\begin{table}[h]
-\centering
-\caption{Final Rankings}
-\begin{tabular}{clccc}
-\toprule
-\textbf{Rank} & \textbf{Idea} & \textbf{Novelty} & \textbf{Oral} & \textbf{Close Competitor?} \\
-\midrule
-1 & DynaCLIP & 9/10 & 8/10 & None (25+ papers checked) \\
-2 & PhysBridge & 9/10 & 8/10 & None (physics FMs untouched) \\
-3 & PhysSteering & 8/10 & 8/10 & None (Walrus $\neq$ robot WM) \\
-4 & PhysContext & 7/10 & 7/10 & DALI (75\% overlap) \\
-5 & Zero-Success & 9/10 & 7--9/10 & None (Grollman 2011 only) \\
-\bottomrule
-\end{tabular}
-\end{table}
+The DynaCLIP model uses DINOv2-ViT-B/14 (86M parameters, loaded via torch.hub.load facebookresearch/dinov2 dinov2\_vitb14) as the backbone, extracting the CLS token concatenated with mean-pooled patch tokens to get a 1536-dimensional vector, followed by a projection head of Linear(1536, 768) then LayerNorm then GELU then Linear(768, 512) with L2 normalization, producing a 512-dimensional unit-norm embedding. The backbone is UNFROZEN during pre-training to reshape the feature space from semantic to dynamics similarity. The projection head is discarded after pre-training. Train with a Soft InfoNCE loss: given embeddings z\_i and z\_j for a batch of B pairs and the B-by-B pairwise dynamics similarity matrix, compute logits as z\_i times z\_j transpose divided by temperature, compute soft labels as softmax of the dynamics similarity matrix divided by 0.1, and minimize the cross-entropy between soft labels and log-softmax of logits. Use AdamW with backbone learning rate 1e-5 and projection head learning rate 1e-3, weight decay 0.05, cosine annealing schedule with 500 warmup steps, batch size 1024 pairs across 8 GPUs, learnable temperature initialized at 0.07, train for 100K steps in bf16 precision, with augmentation of RandomResizedCrop at scale 0.8-1.0, RandomHorizontalFlip, and ColorJitter at 0.1.
 
-\newpage
+Compare against 8 baselines, all used as frozen visual encoders: (1) DINOv2-ViT-B/14 pretrained, (2) DINOv2-ViT-L/14 pretrained, (3) SigLIP-ViT-B/16 from google/siglip-base-patch16-224, (4) CLIP-ViT-L/14 from openai/clip-vit-large-patch14, (5) R3M loaded via pip install r3m then r3m.load\_r3m resnet50, (6) VIP loaded via pip install vip, (7) MCR pretrained on DROID if weights available otherwise re-implement the dynamics alignment contrastive loss from arXiv 2410.22325, and (8) DynaCLIP with backbone frozen (only projection trains, as ablation).
+
+Run 5 experiments. Experiment 1 Physics Property Linear Probing: train a single linear layer on frozen representations to predict mass (MSE loss, report R-squared), friction (same), restitution (same), and material category (10 classes, report accuracy) on held-out data, with 5 seeds and 95\% confidence intervals. Experiment 2 Invisible Physics Test: on the 500 visually identical pairs, report (a) the distribution of cosine similarities under each encoder showing DINOv2 peaks near 1.0 while DynaCLIP spreads below 0.8, (b) binary classification accuracy for which object is heavier with DynaCLIP expected above 85\% and others near 50\%, and (c) train a Diffusion Policy on a grasp-and-lift task with varying object mass and show DynaCLIP-backed policy adjusts grasp force while DINOv2-backed fails. Experiment 3 Downstream World Model: train a Dreamer-v3 style RSSM with 512-dim stochastic state using 32 categoricals times 32 classes and 512-dim deterministic GRU state using each encoder as frozen backbone on ManiSkill3 push, pick-and-place, and stack with physics variation at 10K trajectories each, and report latent MSE at horizons t+1, t+5, t+10, t+20, plus reconstruction SSIM and LPIPS, FVD over 16-frame clips, object position L2 error, and physics violation rate. Experiment 4 Downstream Diffusion Policy: train the Diffusion Policy from Cheng Chi et al.\ 2023 with 16-step action chunks and 7-DoF actions using DDPM with 100 denoising steps for training and DDIM with 10 steps for inference, with each encoder as frozen backbone, on these benchmarks: LIBERO-10 with 50 demos per task reporting average success rate over 10 tasks times 100 episodes times 3 seeds, LIBERO-Long for long-horizon tasks, a custom Physics-Varying Benchmark where training uses mass 0.5-2.0 kg and friction 0.5-1.0 but testing uses mass 0.1 and 5.0 kg and friction 0.1 and 1.5, and CALVIN ABC-D with 5-step instruction chains. Experiment 5 Zero-Shot Physics Inference: build a library of 1000 objects with known properties, for each query image find 5 nearest neighbors in each encoder's embedding space, predict properties as similarity-weighted average, report R-squared for each encoder.
+
+Run 8 ablation studies: (1) dynamics similarity metric comparing DTW versus endpoint L2 versus full trajectory MSE versus velocity-only DTW, (2) number of diagnostic test actions K in 1, 3, 5, 10, (3) contrastive loss formulation comparing Soft InfoNCE versus standard binary InfoNCE versus triplet loss versus BYOL-style non-contrastive, (4) hard negative ratio in 0\%, 15\%, 30\%, 50\%, (5) backbone initialization comparing DINOv2 versus ImageNet versus random, (6) data scale at 10K, 25K, 50K, 100K images plotting a scaling curve, (7) physical property diversity comparing mass only versus friction only versus mass plus friction versus all properties, and (8) fine-tuning depth comparing freeze all versus unfreeze last 2 layers versus last 4 versus all. Finally, produce analysis: t-SNE and UMAP visualizations of DynaCLIP versus DINOv2 embedding spaces colored by object category versus mass versus friction, Jacobian analysis of partial z over partial mass and partial z over partial friction showing DynaCLIP is sensitive to physics changes while DINOv2 is near zero, cross-simulator transfer from ManiSkill3 pretraining to Isaac Lab evaluation, and computational cost showing DynaCLIP adds zero inference overhead since it is the same architecture as DINOv2 with different weights.
+
 %=====================================================================
-\section{Idea \#1: DynaCLIP --- Contrastive Dynamics-Vision Alignment}
-\label{sec:dynaclip}
+\section{Idea \#2: PhysBridge}
 %=====================================================================
 
-\subsection{Core Thesis}
+Build a project called PhysBridge that adapts a pretrained physics foundation model to robot manipulation and shows that physics-first pretraining outperforms video-first pretraining for manipulation world models. This idea has been verified novel --- PhysiX (4.5B params, arXiv 2506.17774), Walrus (1.3B, arXiv 2511.15684), and GPhyT (1.8TB data, arXiv 2509.13805) all exist as physics foundation models but none has been adapted to robot manipulation. The core claim is that adapting a physics FM to manipulation yields better data efficiency and physical reasoning than adapting a video FM like DreamZero or Cosmos, because physics understanding (forces, contacts, Newton's laws) transfers directly while video pattern-matching does not.
 
-CLIP aligned vision with language. \textbf{DynaCLIP} aligns vision with physics. Two observations are positive pairs if the physical systems respond similarly to the same actions (produce similar trajectories), regardless of visual appearance. Hard negatives are visually similar but dynamically different (e.g., ceramic vs.\ plastic mug). Pre-trained once on simulation data, DynaCLIP produces a frozen visual backbone that replaces DINOv2/CLIP/SigLIP for any downstream robotics task.
+The architecture has three modules. Module 1 is a Visual Perception Adapter that converts RGB 224x224 images into physics-interpretable state tokens: use DINOv2-ViT-B/14 as a frozen backbone producing 256 patch tokens of 768 dimensions each, then a 6-layer Transformer decoder with 10 learned object queries that cross-attend to the patch tokens and output per-object state vectors containing 3D position, 3D velocity, 32-dimensional shape embedding, 4D quaternion orientation, and 4D bounding box totaling 46 dimensions per object, projected to the physics FM token dimension. Train this adapter with supervision from simulator ground-truth object states. Module 2 is the Physics Foundation Model Backbone: either download pretrained GPhyT weights from arXiv 2509.13805 (hybrid neural-differentiator plus numerical-integrator) or PhysiX weights from arXiv 2506.17774 (4.5B autoregressive physics token predictor), or if neither is available, train a fallback GNN-based dynamics model following the Graph Network Simulator architecture from Sanchez-Gonzalez et al.\ 2020 with 8-layer GNN using Transformer-style message passing, 512-dimensional node features, 128-dimensional edge features, approximately 200M parameters, trained on 10M+ diverse non-robot physics episodes from Isaac Lab covering rigid body dynamics with objects falling bouncing sliding colliding stacking across 50+ object types with mass 0.01 to 50 kg and friction 0.01 to 2.0 (2M episodes), multi-body interactions with 2-5 objects chain reactions dominos bowling-style (500K episodes), and contact dynamics focused on grasping geometry insertion and surface forces (500K episodes). Insert LoRA adapters at rank 16 into each attention layer of the physics FM, keeping backbone weights frozen during manipulation fine-tuning. Module 3 is a Robot Action Adapter: a 2-layer MLP mapping 7-dimensional actions (delta position, delta orientation, gripper) through 256 hidden units with SiLU activation to the physics FM token dimension, injected as an intervention node connected to objects near the end-effector.
 
-\textbf{Novelty:} Verified against 25+ papers. NO prior work uses dynamics similarity as contrastive metric. MCR (ICLR 2025) uses temporal co-occurrence; CLASS (CoRL 2025) uses action-sequence DTW; PSE (ICLR 2021) uses policy similarity. All fundamentally different.
+For manipulation fine-tuning data, use ManiSkill3 with Push, PickAndPlace, Stack, and PegInsert tasks at 5K trajectories per task with physics variation, LIBERO-90 with the provided 50 demos per task, CALVIN with 24 hours of play data plus 20K annotated trajectories, and RLBench-18 with 100 demos per task variation following the Mini Diffuser setup. Compare against 7 baselines: (1) Cosmos Policy from NVIDIA arXiv 2601.16163 representing the video FM to manipulation path, (2) DreamZero-style World Action Model by fine-tuning Cosmos-Predict2.5-2B or Stable Video Diffusion jointly on video plus action prediction, (3) Dreamer-v3 from official danijar/dreamerv3 trained from scratch with no foundation model, (4) TD-MPC2 from nicklashansen/tdmpc2 as the implicit world model baseline, (5) SimDist from arXiv 2603.15759 which pretrains in robot-specific simulation not general physics, (6) PhysBridge-NoPretraining with the same architecture but physics backbone initialized randomly, and (7) PhysBridge-VideoInit with the physics backbone initialized from video FM weights instead.
 
-\subsection{Data Generation (ManiSkill3)}
+Run 5 experiments all in simulation. Experiment 1 Data Efficiency which is the key result: fix LIBERO-10 as the target benchmark, vary fine-tuning data at 5\%, 10\%, 25\%, 50\%, and 100\% of available demos, plot success rate versus data fraction for all methods, with the expected result that PhysBridge at 10\% data matches DreamZero at 100\%. Experiment 2 Multi-Benchmark Evaluation with full data on LIBERO-10 (10 tasks, 100 episodes times 3 seeds), LIBERO-Long, CALVIN ABC-D (5-step chains, report average chain length), ManiSkill3 with physics variation, and RLBench-18. Experiment 3 Physics Generalization: train on standard physics then test on extreme physics with mass 10 times heavier and friction 5 times lower to show PhysBridge degrades gracefully while video-based models collapse. Experiment 4 World Model Prediction Quality: report object position L2 error at horizons t+1, t+5, t+10, t+20, t+50, physics violation rate including penetration and gravity violations, and contact prediction accuracy. Experiment 5 Cross-Simulator Transfer: train PhysBridge on ManiSkill3 and evaluate on LIBERO which uses a different simulator and renderer. Run 8 ablations: (1) physics FM backbone comparing GPhyT versus PhysiX versus our GNN versus random initialization, (2) adapter type comparing LoRA versus full fine-tune versus frozen backbone, (3) perception adapter quality comparing ground-truth object states oracle versus learned perception versus raw DINOv2 features, (4) physics pretraining data diversity comparing rigid-only versus rigid plus multi-body versus all, (5) pretraining data scale at 100K, 500K, 1M, and 3M episodes, (6) robot action injection method comparing intervention node versus concatenation versus cross-attention, (7) number of trainable parameters at 1M, 5M, 20M, and 50M via LoRA rank, and (8) perception error tolerance analysis. Also produce analysis: probe physics FM features before and after fine-tuning to understand what transfers, CKA similarity between physics FM and video FM internal representations, failure analysis on deformable objects, and scaling analysis from 200M to 500M to 1B physics FM.
 
-\begin{itemize}[nosep]
-\item \textbf{Objects:} 50 geometries $\times$ 5 textures = 250 visual variants
-\item \textbf{Physics per object:} 100 random configs from:
-  \begin{itemize}[nosep]
-  \item Mass: log-uniform $[0.05, 10.0]$ kg (8 bins)
-  \item Static friction: uniform $[0.05, 1.5]$ (8 bins)
-  \item Restitution: uniform $[0.0, 0.95]$ (6 bins)
-  \end{itemize}
-\item \textbf{Total:} 5,000 object-property configs $\times$ 20 images = 100K images
-\item \textbf{Diagnostic actions} ($K{=}5$ per config): Push-X, Push-Y, Lift-and-Drop, Flick, Press-Down. Record trajectories $\tau_k \in \mathbb{R}^{50 \times 13}$ (position, orientation, velocity) at 20Hz.
-\item \textbf{Dynamics similarity:}
-\begin{equation}
-\text{sim}_{\text{dyn}}(i,j) = -\frac{1}{K}\sum_{k=1}^{K} \text{DTW}(\tau_k^i, \tau_k^j), \quad \text{normalized to } [0,1]
-\end{equation}
-\item \textbf{Pair mining:} 30\% hard negatives (visual sim $> 0.9$, dyn sim $< 0.3$), 30\% hard positives (visual sim $< 0.5$, dyn sim $> 0.7$), 40\% random
-\item \textbf{Invisible Physics set:} 500 pairs, visually identical (same mesh/texture/viewpoint), different physics
-\end{itemize}
-
-\subsection{Model Architecture}
-
-\begin{lstlisting}[language=Python, caption=DynaCLIP Architecture]
-# Visual Encoder (unfrozen during pre-training)
-backbone = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitb14')  # 86M
-# Extract CLS + mean-pooled patches -> 1536-d
-proj = nn.Sequential(
-    nn.Linear(1536, 768), nn.LayerNorm(768), nn.GELU(),
-    nn.Linear(768, 512)  # L2-normalize output
-)
-# Output: z in R^512 (unit norm)
-\end{lstlisting}
-
-\begin{lstlisting}[language=Python, caption=Soft InfoNCE with Dynamics Similarity]
-def dynaclip_loss(z_i, z_j, sim_dyn_matrix, temperature=0.07):
-    """z_i, z_j: [B, 512], sim_dyn_matrix: [B, B] in [0,1]"""
-    logits = z_i @ z_j.T / temperature  # [B, B]
-    labels = F.softmax(sim_dyn_matrix / 0.1, dim=1)  # soft targets
-    loss = -torch.sum(labels * F.log_softmax(logits, dim=1)) / B
-    return loss
-\end{lstlisting}
-
-\textbf{Training:} AdamW (backbone lr $10^{-5}$, projection lr $10^{-3}$), weight decay 0.05, cosine schedule, 500 warmup, 100K steps, batch 1024, bf16, learnable temperature init 0.07.
-
-\textbf{Ablation backbones:} DINOv2-ViT-L/14, SigLIP-ViT-B/16, ViT-B/14 from scratch, DINOv2-B frozen.
-
-\subsection{Evaluation}
-
-\subsubsection{Exp 1: Physics Property Linear Probing}
-Train linear layer (frozen encoder $\to$ property) on held-out data. Predict mass (R$^2$), friction (R$^2$), restitution (R$^2$), material (accuracy). \textbf{8 encoders:} DynaCLIP, DINOv2-B, DINOv2-L, SigLIP-B, CLIP-L, R3M, VIP, MCR. 5 seeds, 95\% CI.
-
-\subsubsection{Exp 2: Invisible Physics Test}
-500 visually identical pairs. (a) Cosine similarity distribution, (b) binary classification accuracy (which is heavier?), (c) downstream policy: diffusion policy grasp-and-lift with varying mass.
-
-\subsubsection{Exp 3: Downstream World Model}
-Dreamer-v3 RSSM (512-d stochastic, 512-d deterministic GRU, 32$\times$32 categoricals) with each encoder as frozen backbone. Metrics: latent MSE at $t{+}\{1,5,10,20\}$, SSIM, LPIPS, FVD, object position L2, physics violation rate.
-
-\subsubsection{Exp 4: Downstream Diffusion Policy}
-Diffusion Policy (Chi et al., 2023), 16-step action chunks, DDPM 100 / DDIM 10 steps. \textbf{Benchmarks:} LIBERO-10 (50 demos/task), LIBERO-Long, Physics-Varying (custom), CALVIN ABC-D. 100 episodes $\times$ 3 seeds.
-
-\subsubsection{Exp 5: Zero-Shot Physics Inference}
-$k$-NN in DynaCLIP space over 1000-object library. Predict physics as weighted average of 5 nearest neighbors.
-
-\subsection{Ablation Studies (8)}
-\begin{enumerate}[nosep]
-\item Dynamics similarity metric: DTW vs.\ endpoint L2 vs.\ trajectory MSE vs.\ velocity-only DTW
-\item Number of test actions $K$: $\{1,3,5,10\}$
-\item Contrastive loss: Soft InfoNCE vs.\ binary InfoNCE vs.\ triplet vs.\ BYOL
-\item Hard negative ratio: $\{0\%, 15\%, 30\%, 50\%\}$
-\item Backbone init: DINOv2 vs.\ ImageNet vs.\ random
-\item Data scale: $\{10\text{K}, 25\text{K}, 50\text{K}, 100\text{K}\}$ images
-\item Property diversity: \{mass only, friction only, mass+friction, all\}
-\item Fine-tuning depth: freeze all / last 2 / last 4 / all layers
-\end{enumerate}
-
-\subsection{Analysis}
-(1) t-SNE/UMAP colored by mass/friction vs.\ object category. (2) Jacobian $\partial z/\partial \text{mass}$, $\partial z/\partial \text{friction}$. (3) Cross-simulator transfer (ManiSkill3 $\to$ Isaac Lab). (4) Qualitative on DROID/BridgeData V2 images. (5) Zero inference overhead (same arch as DINOv2).
-
-\newpage
 %=====================================================================
-\section{Idea \#2: PhysBridge --- Physics Foundation Models $\to$ Manipulation}
-\label{sec:physbridge}
+\section{Idea \#3: PhysSteering}
 %=====================================================================
 
-\subsection{Core Thesis}
+Build a project called PhysSteering that discovers and steers emergent physics features in robot world models using Sparse Autoencoders. The Walrus Physics Steering paper (arXiv 2511.20798) showed that physics foundation models learn abstract transferable physical concepts like vorticity and diffusion that can be extracted as activation vectors and steered across unrelated systems. The Stanford SAE paper (arXiv 2603.19183) applied Sparse Autoencoders to VLAs and found steerable motion primitives. Nobody has combined these techniques to discover and steer physics features in robot world models like DreamZero, Dreamer-4, or Cosmos. This idea has been verified novel.
 
-PhysiX (4.5B) and Walrus (1.3B) understand physics. DreamZero (14B) understands video. We show adapting a \textbf{physics FM} to manipulation outperforms adapting a \textbf{video FM} --- because physics transfers but visual patterns don't. This directly answers: should robot FMs be built on video or physics?
+Start by generating physics-varying manipulation data in ManiSkill3: 30 object types times 100 physical property configurations covering mass, friction, and restitution, across 6 tasks (Push, PickAndPlace, Stack, Slide, LiftAndDrop, PegInsert) with 50 trajectories per task per config giving 900K total trajectories. Record RGB frames, actions, proprioception, object states, and ground-truth physics parameters. Train reproduction world models if the full-size open-sourced models are too expensive to run activations through: a DreamZero-style DiT-based world action model at 300-500M parameters, a Dreamer-v3-style RSSM model at 300M parameters, and a Cosmos-style flow-matching model at 300M parameters, all trained on the ManiSkill3 data WITH physics variation. Then run forward passes of each model on all trajectories and extract hidden activations at every layer and every timestep, storing them as memory-mapped numpy arrays at approximately 50GB per model. If the open-sourced DreamZero-14B is feasible, also extract its activations as the primary analysis target.
 
-\textbf{Novelty:} PhysiX, Walrus, GPhyT published in 2025 but NONE adapted to manipulation. Verified against 25+ papers.
+Train Sparse Autoencoders on the extracted activations following the Anthropic and OpenAI mechanistic interpretability methodology. The SAE architecture for each layer takes an input activation vector h of dimension d\_model, encodes it through a linear layer W\_enc of shape M by d\_model with bias followed by ReLU to produce sparse features f of dimension M, then decodes through W\_dec of shape d\_model by M with bias to reconstruct h\_hat, trained with MSE reconstruction loss plus lambda times L1 sparsity penalty on f. Sweep dictionary sizes M in 1K, 4K, 16K, and 64K, and sparsity lambda in 1e-4, 3e-4, and 1e-3. Use Adam at learning rate 3e-4, 100K steps, batch size 4096 activations per step. Train one SAE per layer per dictionary size, giving approximately 112 SAEs per model, each training in about 1 hour on a single GPU. For each SAE feature f\_i, compute Pearson correlation with every ground-truth physical quantity (mass, friction, restitution, velocity magnitude, contact force magnitude), flagging features with absolute correlation above 0.5 and p-value below 0.001 as physics features. Also compute mutual information for nonlinear relationships, selectivity index for whether the feature activates for one property or multiple, and consistency across tasks.
 
-\subsection{Architecture (3 Modules)}
+Test steerability by taking a rollout with an object of mass m1, clamping the discovered mass feature to the activation level corresponding to mass m2 at a midway point, continuing the rollout, and measuring whether the predicted dynamics change as if the object now has mass m2. Compute a steerability score as the correlation between the change in feature activation and the change in predicted dynamics. Run control experiments: steer a random feature (dynamics should not change systematically), steer the mass feature (only mass-related dynamics should change not friction behavior), and steer on task A push and evaluate on task B pick (does steering transfer across tasks). Apply physics steering for adaptation: when encountering a novel object with unknown physics, observe one interaction, search over physics feature activations to minimize prediction error with zero gradient updates in approximately 10ms, then use the steered world model for planning.
 
-\subsubsection{Module 1: Visual Perception Adapter (RGB $\to$ Physics State Tokens)}
-\begin{lstlisting}[language=Python, caption=Perception Adapter]
-# DINOv2 frozen backbone -> 256 patch tokens (768-d)
-# 6-layer Transformer decoder with N_obj=10 object queries
-# Per-object output: position(3) + velocity(3) + shape_emb(32)
-#   + orientation(4) + bbox(4) = 46-d -> project to FM_dim
-# Trained with GT object state supervision from sim
-\end{lstlisting}
+Compare against 6 baselines: (1) unsteered world model with no adaptation, (2) fine-tuned world model with 100 gradient steps on novel object data, (3) LoRA-adapted world model with 50 gradient steps, (4) random feature steering as a control, (5) AdaptiGraph gradient-based physics parameter optimization from arXiv 2407.07889, and (6) direct diffusion policy with no world model. Run experiments on ManiSkill3 with physics-varying objects evaluating success rate and adaptation time, comparing steering at approximately 10ms versus fine-tuning at approximately 5 seconds versus LoRA at approximately 3 seconds. Run 8 ablations: (1) dictionary size at 1K, 4K, 16K, 64K, (2) sparsity lambda, (3) physics-varied versus fixed-physics training data for the world model, (4) model scale at 300M, 1B, 2B, 14B asking what minimum scale produces physics features, (5) which layers contain physics features (early versus mid versus late), (6) SAE features versus PCA directions versus random directions for steerability, (7) number of training object types at 5, 15, 30, 50, and (8) steering method comparing activation clamping versus activation addition versus linear steering vector. Produce analysis: t-SNE of activations colored by mass and friction, feature ablation study zeroing out physics features to see if the world model loses physics understanding, qualitative rendered videos showing predicted dynamics with and without steering, and a comparison table across all three model architectures showing which develops the cleanest physics features.
 
-\subsubsection{Module 2: Physics FM Backbone (frozen + LoRA)}
-Options: (a) GPhyT (2509.13805), (b) PhysiX (2506.17774, 4.5B), (c) fallback: GNN-based dynamics (GNS architecture, ${\sim}200$M params) trained on 10M+ non-robot physics episodes from Isaac Lab.
-
-LoRA adapters (rank 16) at each attention layer. Only LoRA trains during manipulation fine-tuning.
-
-\subsubsection{Module 3: Robot Action Adapter}
-MLP: $7 \to 256 \to \text{FM\_dim}$ (SiLU). Action token injected as intervention node connected to objects near end-effector.
-
-\subsection{Data}
-
-\textbf{Physics pre-training (if needed):} 3M episodes in Isaac Lab --- rigid body dynamics (2M), multi-body interactions (500K), contact dynamics (500K). No robot. Objects falling, bouncing, sliding, colliding, stacking. 50+ object types, mass $[0.01{-}50]$ kg, friction $[0.01{-}2.0]$.
-
-\textbf{Manipulation fine-tuning:} ManiSkill3 (Push, Pick\&Place, Stack, PegInsert, 5K traj/task), LIBERO-90 (50 demos/task), CALVIN (24h play), RLBench-18 (100 demos/variation).
-
-\subsection{Baselines (7)}
-\begin{enumerate}[nosep]
-\item \textbf{Cosmos Policy} (NVIDIA): video FM $\to$ manipulation
-\item \textbf{DreamZero-style WAM:} video diffusion + action prediction
-\item \textbf{Dreamer-v3:} from scratch, no FM pre-training
-\item \textbf{TD-MPC2:} implicit world model + CEM
-\item \textbf{SimDist} (2603.15759): robot-specific sim pre-training
-\item \textbf{PhysBridge-NoPretraining:} same arch, physics backbone from scratch
-\item \textbf{PhysBridge-VideoInit:} init physics backbone from video FM weights
-\end{enumerate}
-
-\subsection{Experiments (Sim-Only)}
-
-\subsubsection{Exp 1: Data Efficiency (Key Result)}
-Fix LIBERO-10. Vary fine-tuning data: $\{5\%, 10\%, 25\%, 50\%, 100\%\}$. Plot success rate vs.\ data fraction. \textbf{Expected:} PhysBridge at 10\% matches DreamZero at 100\%.
-
-\subsubsection{Exp 2: Multi-Benchmark Full Evaluation}
-LIBERO-10, LIBERO-Long, CALVIN ABC-D, ManiSkill3 (physics-varying), RLBench-18. 100 episodes $\times$ 3 seeds per task.
-
-\subsubsection{Exp 3: Physics Generalization}
-Train on standard physics. Test on extreme: mass $10\times$ heavier, friction $5\times$ lower.
-
-\subsubsection{Exp 4: World Model Prediction Quality}
-Object position L2 at $t{+}\{1,5,10,20,50\}$, physics violation rate, contact prediction accuracy.
-
-\subsubsection{Exp 5: Cross-Simulator Transfer}
-Train PhysBridge on ManiSkill3. Eval on LIBERO (different renderer).
-
-\subsection{Ablations (8)}
-(1) Physics FM backbone (GPhyT vs.\ PhysiX vs.\ GNN vs.\ random). (2) Adapter type (LoRA vs.\ full vs.\ frozen). (3) Perception quality (GT states vs.\ learned vs.\ DINOv2). (4) Pre-training data diversity. (5) Pre-training data scale $\{100\text{K}{-}3\text{M}\}$. (6) Action injection method. (7) LoRA rank $\{1\text{M}{-}50\text{M}\}$ params. (8) Perception error tolerance.
-
-\subsection{Analysis}
-(1) What transfers: probe features before/after fine-tuning. (2) CKA similarity: physics FM vs.\ video FM representations. (3) Failure analysis (deformable objects). (4) Scaling: 200M $\to$ 1B physics FM.
-
-\newpage
 %=====================================================================
-\section{Idea \#3: PhysSteering --- Physics Neurons in Robot World Models}
-\label{sec:physsteering}
+\section{Idea \#4: PhysContext}
 %=====================================================================
 
-\subsection{Core Thesis}
+Build a project called PhysContext that implements in-context physical property learning for manipulation world models, where the model learns an object's physics from watching a single diagnostic interaction with zero fine-tuning and zero gradient updates, purely through in-context learning in the Transformer's context window. Note that DALI (NeurIPS 2025, arXiv 2508.20294) has 75\% overlap with this idea --- it does context-conditioned world model adaptation without gradients on MetaWorld using a latent context vector. The critical differentiator is that PhysContext encodes explicit interpretable physics parameters enabling compositional transfer: given object A with mass 2kg and friction 0.3 and object B with mass 0.5kg and friction 1.0, PhysContext can compose the physics to predict a novel object C with mass 2kg from A and friction 1.0 from B that was never seen during training. DALI cannot do this because its latent context is opaque. This compositional transfer experiment is the make-or-break experiment that justifies the paper relative to DALI.
 
-Walrus ``Physics Steering'' (2511.20798) showed physics FMs learn steerable abstract concepts. SAEs applied to VLAs (Stanford, 2603.19183). \textbf{Nobody has applied these to robot world models.} We discover that DreamZero/Dreamer-4/Cosmos spontaneously develop ``mass neurons'' and ``friction neurons'' --- steerable features that adapt the model to novel physics without fine-tuning.
+The architecture is a causal Transformer with 12 layers, hidden dimension 512, 8 attention heads, feedforward dimension 2048, SiLU activations, RMSNorm pre-normalization, Rotary Position Embeddings, maximum context length 4096 tokens, approximately 85M parameters. The visual tokenizer is a frozen DINOv2-ViT-B/14 that converts each 224x224 RGB frame into 256 patch tokens of 768 dimensions each, projected to 512 dimensions via a learned linear layer. The input sequence is structured as: CTX\_START token, then K diagnostic frames each consisting of 256 visual tokens plus 1 action token, then CTX\_END token, then 256 visual tokens for the current observation, 1 proprioception token from a 2-layer MLP encoding joint positions and velocities, and 1 action token from a 2-layer MLP encoding the 7-DoF robot action, with the model predicting the next 256 visual tokens. Add learned segment embeddings distinguishing context tokens (segment 0) from current state tokens (segment 1). The prediction loss is L2 in DINOv2 feature space with an auxiliary pixel reconstruction loss weighted at 0.05 using a ConvTranspose decoder for visualization. Train with AdamW at learning rate 3e-4, cosine schedule with 2000 warmup steps, 500K total steps, batch size 128, bf16 precision, and a context curriculum that starts with K=10 diagnostic frames for the first 100K steps, K=5 for steps 100K-300K, and K uniformly sampled from 1 to 10 for steps 300K-500K.
 
-\subsection{Method}
+Generate data in ManiSkill3 with 30 object types times 100 physical property configurations giving 3,000 configs, 5 diagnostic actions (push-X, push-Y, lift-and-drop, flick, press-down) each producing 10 frames at 5Hz, and 6 manipulation tasks with 20 trajectories per config. Split train/val/test by property COMBINATION at 70/15/15 so that the test set contains novel property combinations never seen during training, and also hold out 5 object geometries entirely. Compare against 8 baselines: (1) No-Context which is the same Transformer but with zero vector replacing the diagnostic context, (2) DALI reproduced from arXiv 2508.20294 which is the most critical baseline, (3) AdaptiGraph-style gradient-based physics optimization at test time with 10, 50, and 100 gradient steps, (4) Oracle-Numerical where ground-truth physics parameters are directly input instead of diagnostic context, (5) Dreamer-v3, (6) TD-MPC2, (7) Average-Context where the same average-physics diagnostic context is always provided, and (8) Random-Context where diagnostic context comes from a random different object.
 
-\subsubsection{Step 1: Activation Extraction}
-Generate rollouts with physics variation in ManiSkill3 (30 objects $\times$ 100 configs $\times$ 6 tasks $\times$ 50 traj = 900K trajectories). Run through world model, extract hidden activations at every layer, every timestep. Store as memory-mapped arrays (${\sim}50$ GB per model).
+Run 6 experiments. Experiment 1 Compositional Transfer which is the core differentiator: take object A with known mass and friction and object B with different mass and friction, provide separate diagnostic contexts from each, compose the physics information, and predict dynamics for novel object C combining properties from A and B that was never in training data, showing PhysContext succeeds while DALI fails. Experiment 2 Prediction Quality on Novel Physics: compare latent MSE, SSIM, LPIPS, and FVD at horizons t+1, t+5, t+10, t+20 on held-out property combinations against DALI, No-Context, and Oracle, showing PhysContext approaches Oracle more closely than DALI on novel combinations. Experiment 3 Context Scaling: vary K from 0 to 10 diagnostic frames and plot prediction error versus K, comparing against AdaptiGraph adaptation curves with 0 to 500 gradient steps, showing PhysContext at K=1 matches AdaptiGraph at 100 gradient steps while being 500 times faster. Experiment 4 Downstream Policy: Diffusion Policy with MPC planning on LIBERO-10, LIBERO-Long, ManiSkill3 physics-varying, and CALVIN ABC-D with 100 episodes times 3 seeds. Experiment 5 Physics Inference: linear probe on the CTX\_END hidden state to predict mass, friction, and restitution, comparing R-squared against DALI's latent context. Experiment 6 Invisible Physics Test: 500 visually identical pairs, report KL divergence between predicted dynamics distributions. Run 8 ablations: (1) context length K from 0 to 20, (2) which diagnostic action type, (3) visual backbone, (4) model scale from 4 to 24 layers, (5) context curriculum, (6) training physics diversity, (7) with versus without segment embeddings, and (8) cross-task context using push diagnostics for pick-and-place evaluation.
 
-\subsubsection{Step 2: Sparse Autoencoder Training}
-\begin{lstlisting}[language=Python, caption=SAE Architecture]
-# Per layer, per dictionary size
-class SAE(nn.Module):
-    def __init__(self, d_model, M):  # M = dictionary size
-        self.W_enc = nn.Linear(d_model, M, bias=True)  # encoder
-        self.W_dec = nn.Linear(M, d_model, bias=True)  # decoder
-    def forward(self, h):
-        f = F.relu(self.W_enc(h))       # sparse features
-        h_hat = self.W_dec(f)            # reconstruction
-        return h_hat, f
-    def loss(self, h):
-        h_hat, f = self.forward(h)
-        return F.mse_loss(h, h_hat) + lam * f.abs().mean()
-\end{lstlisting}
-
-Dictionary sizes $M \in \{1\text{K}, 4\text{K}, 16\text{K}, 64\text{K}\}$. Sparsity $\lambda \in \{10^{-4}, 3{\times}10^{-4}, 10^{-3}\}$. Adam lr $3{\times}10^{-4}$, 100K steps, batch 4096. Total: ${\sim}112$ SAEs per model.
-
-\subsubsection{Step 3: Physics Feature Discovery}
-For each feature $f_i$, compute Pearson correlation with ground-truth physics:
-\begin{equation}
-r(f_i, \text{mass}) = \text{pearsonr}(\{f_i(x)\}_{x \in \mathcal{D}}, \{\text{mass}(x)\}_{x \in \mathcal{D}})
-\end{equation}
-Features with $|r| > 0.5$ and $p < 0.001$ are ``physics features.''
-
-\subsubsection{Step 4: Steerability Test}
-Clamp ``mass feature'' to high activation $\to$ does predicted inertia increase? Measure:
-\begin{equation}
-\text{steer\_score} = \text{corr}(\Delta f_{\text{activation}}, \Delta \text{predicted\_dynamics})
-\end{equation}
-
-\subsection{Target Models}
-(1) DreamZero 14B (open-sourced, primary). (2) Dreamer-4 (2B). (3) Cosmos-Predict2.5-2B. (4) Reproduction models (300M--500M) trained on ManiSkill3 with physics variation.
-
-\subsection{Baselines (6)}
-(1) Unsteered model. (2) Fine-tuned (100 gradient steps). (3) LoRA-adapted. (4) Random feature steering. (5) AdaptiGraph (optimization-based). (6) Direct policy (no WM).
-
-\subsection{Experiments}
-(1) \textbf{Discovery:} per-layer heatmap of feature $\times$ physics-property correlation. (2) \textbf{Steerability:} steering strength $\{0.5\times{-}5\times\}$ vs.\ dynamics change. (3) \textbf{Adaptation:} novel physics on ManiSkill3 --- compare steering (${\sim}10$ ms) vs.\ fine-tuning (${\sim}5$ s). (4) \textbf{Cross-task transfer:} mass feature from push $\to$ grasping. (5) \textbf{Cross-model:} compare emergence across DreamZero, Dreamer, Cosmos.
-
-\subsection{Ablations (8)}
-(1) Dictionary size. (2) Sparsity $\lambda$. (3) Physics-varied vs.\ fixed-physics training data. (4) Model scale: 300M--14B. (5) Layer depth. (6) SAE vs.\ PCA vs.\ random directions. (7) Object diversity. (8) Steering method: clamping vs.\ addition vs.\ linear vector.
-
-\newpage
 %=====================================================================
-\section{Idea \#4: PhysContext --- In-Context Physics Learning}
-\label{sec:physcontext}
+\section{Idea \#5: Zero-Success Learning}
 %=====================================================================
 
-\subsection{Core Thesis}
+Build a project called Zero-Success Learning that demonstrates robot manipulation can be learned from ZERO successful demonstrations using only failure data combined with world model imagination. This is verified novel --- only Grollman and Billard at ICRA 2011 attempted failure-only learning and only in low-dimensional settings. No modern work combines failure-only data with world model imagination for manipulation. The core hypothesis is that failed trajectories contain all the dynamics information needed for policy learning because objects still move, contacts still happen, and friction still applies during failures, and the only difference between failure and success is typically a few critical actions near task completion.
 
-A world model learns object physics from watching \textbf{ONE} diagnostic interaction --- zero fine-tuning, pure in-context learning. Like GPT-4 learns from prompt examples.
+The method is a three-stage pipeline. Stage 1 trains a world model on failure-only data using a Dreamer-v3 style RSSM: DINOv2-ViT-B/14 frozen visual encoder projected to 512 dimensions, GRU with 512-dimensional deterministic state, stochastic state with 32 categoricals times 32 classes, transition MLP mapping deterministic plus stochastic plus action to next deterministic, posterior and prior MLPs, ConvTranspose decoder for reconstruction, and critically a goal-proximity reward predictor MLP that outputs how close the current state is to task completion, trained using LPIPS distance between current observation and goal image plus ground-truth object-to-target distance from the simulator. Stage 2 identifies near-success states in the failure trajectories by running the trained goal-proximity function on every timestep and selecting states where proximity exceeds a threshold tau, sweeping tau in 0.5, 0.6, 0.7, 0.8, 0.9 and reporting what fraction of failures contain at least one near-success state. Stage 3 performs imagination-based completion from each near-success state: sample N=256 candidate action sequences of horizon H=10 steps, simulate each forward through the world model, score by goal proximity at the final predicted state, and select the best. Also implement CEM search with 5 iterations keeping the top 10\% and MPPI with temperature 1.0 for comparison. Stitch synthetic successes by concatenating the failure trajectory up to the near-success timestep with the imagined completion, filtering to keep only trajectories where final goal proximity exceeds 0.9. Train a standard Diffusion Policy from Cheng Chi et al.\ 2023 on the synthetic successful trajectories.
 
-\textbf{$\triangle$ DALI overlap (NeurIPS 2025, 2508.20294):} 75\% overlap. \textbf{Differentiator:} compositional transfer --- ``same friction as A + same mass as B $\to$ predict C'' --- impossible with DALI's latent context.
+Collect failure data in ManiSkill3 using three strategies: random policy with uniform random actions at 5K trajectories per task, scripted exploration with heuristic policies that approach but do not complete tasks at 5K per task, and noisy oracle using the oracle policy with heavy action noise at sigma 0.3 producing near-success failures at 5K per task, plus a mixed set of 15K total per task. Tasks are Push-to-Target, Pick-and-Place, Stack, Peg-Insert, Drawer-Open, and Button-Press. Also collect failures in LIBERO-10 with random policies and in CALVIN using random play data. Compare against 8 baselines: (1) behavioral cloning with N successful demonstrations at N equals 1, 5, 10, 25, 50, and 100 per task which is the critical comparison, (2) BC with 0 demos as the lower bound random policy, (3) Dreamer-v3 from scratch with online RL and exploration, (4) Hindsight Experience Replay with goal relabeling, (5) Plan2Explore then fine-tune via world model disagreement for exploration, (6) random augmentation of failure trajectories without world model imagination, (7) DAgger with simulator oracle corrections, and (8) Zero-Success without near-success filtering meaning imagination from all states to test whether near-success identification matters.
 
-\subsection{Architecture}
-
-\begin{lstlisting}[language=Python, caption=PhysContext Transformer]
-# Causal Transformer with physics context window
-config = dict(
-    layers=12, d_model=512, n_heads=8, d_ff=2048,
-    activation='silu', norm='rmsnorm', pos='rope',
-    max_seq_len=4096, params='~85M'
-)
-# Input sequence:
-# [CTX_START] [diag_frame_1...256tok] [diag_action_1] ...
-#   [diag_frame_K...] [CTX_END]
-# [obs_t...256tok] [proprio_t] [action_t]
-# -> predict [obs_{t+1}...256tok]
-# Visual tokenizer: DINOv2-ViT-B/14 (frozen) -> 256 patch tokens
-# Segment embeddings: context=0, current=1
-\end{lstlisting}
-
-\textbf{Training:} AdamW lr $3{\times}10^{-4}$, cosine schedule, 2000 warmup, 500K steps, batch 128, bf16. Context curriculum: $K{=}10 \to K{=}5 \to K{=}\text{uniform}(1,10)$. Loss: latent MSE in DINOv2 space + 0.05 $\times$ pixel reconstruction.
-
-\subsection{Data}
-ManiSkill3: 30 objects $\times$ 100 physics configs = 3,000 configs. 5 diagnostic actions $\times$ 10 frames. 6 tasks $\times$ 20 traj/config. Train/val/test split by property \textbf{combination} (70/15/15).
-
-\subsection{Baselines (8)}
-(1) No-Context (same arch, zero vector). (2) \textbf{DALI} (reproduce --- critical). (3) AdaptiGraph (gradient optimization). (4) Oracle-Numerical. (5) Dreamer-v3. (6) TD-MPC2. (7) Average-Context. (8) Random-Context.
-
-\subsection{Key Experiment: Compositional Transfer (vs.\ DALI)}
-Object A: mass$=$2kg, friction$=$0.3. Object B: mass$=$0.5kg, friction$=$1.0. Novel C: mass$=$2kg (from A) + friction$=$1.0 (from B) --- \textbf{never seen in training}. PhysContext composes physics from A and B contexts. DALI cannot (opaque latent).
-
-\subsection{Other Experiments}
-(1) Prediction quality on novel physics. (2) Context scaling $K{=}\{0{-}10\}$ vs.\ AdaptiGraph gradient steps. (3) Which diagnostic action is most informative? (4) Downstream policy on LIBERO/CALVIN/ManiSkill3. (5) Physics inference from \texttt{[CTX\_END]} hidden state. (6) Invisible Physics Test.
-
-\subsection{Ablations (8)}
-(1) $K$: $\{0,1,2,3,5,10,20\}$. (2) Diagnostic action type. (3) Visual backbone. (4) Model scale: $\{4{-}24\}$ layers. (5) Context curriculum. (6) Training physics diversity. (7) Segment embeddings. (8) Cross-task context.
-
-\newpage
-%=====================================================================
-\section{Idea \#5: Zero-Success Learning --- Manipulation from Failures Alone}
-\label{sec:zerosuccess}
-%=====================================================================
-
-\subsection{Core Thesis}
-
-Learn manipulation using \textbf{ZERO successful demonstrations} --- only failures. The world model learns dynamics from failures (objects still move, contacts still happen), identifies near-success states, and imagines corrective actions. If ``zero successes $\to$ 80\% success'' works, it democratizes robot learning.
-
-\textbf{Novelty:} Only Grollman \& Billard (ICRA 2011) tried failure-only learning in low dimensions. No modern work.
-
-\subsection{Three-Stage Pipeline}
-
-\subsubsection{Stage 1: World Model on Failure Data}
-\begin{lstlisting}[language=Python, caption=RSSM World Model (Dreamer-v3 style)]
-# Visual encoder: DINOv2-ViT-B/14 (frozen) -> Linear(768, 512)
-# RSSM:
-#   Deterministic: GRU(512)
-#   Stochastic: 32 categoricals x 32 classes
-#   Transition: MLP(det + stoch + action -> next_det)
-# Reward predictor: MLP -> goal_proximity (not binary success)
-# Goal proximity = LPIPS(current, goal) + object-target distance
-\end{lstlisting}
-
-\subsubsection{Stage 2: Near-Success Identification}
-\begin{lstlisting}[language=Python, caption=Near-Success State Finding]
-def find_near_success(trajectory, world_model, goal_img, tau=0.7):
-    near_success = []
-    for t, state in enumerate(trajectory):
-        proximity = world_model.predict_goal_proximity(state, goal_img)
-        if proximity > tau:
-            near_success.append((t, state, proximity))
-    return near_success
-\end{lstlisting}
-
-\subsubsection{Stage 3: Imagination-Based Completion}
-\begin{lstlisting}[language=Python, caption=CEM Search for Corrective Actions]
-def imagine_completion(wm, state, goal, N=256, H=10):
-    best_actions, best_score = None, -float('inf')
-    for _ in range(N):
-        action_seq = sample_action_sequence(H)
-        predicted = wm.rollout(state, action_seq)
-        score = goal_proximity(predicted[-1], goal)
-        if score > best_score:
-            best_score, best_actions = score, action_seq
-    return best_actions  # also try CEM (5 iters, top 10%) and MPPI
-\end{lstlisting}
-
-\textbf{Trajectory stitching:} \texttt{synthetic = failure[0:t\_near] + imagined[t\_near:t\_near+H]}. Filter: keep only if final proximity $> 0.9$.
-
-\textbf{Policy training:} Diffusion Policy (Chi et al.) on synthetic successes.
-
-\subsection{Failure Data Collection (ManiSkill3)}
-\begin{itemize}[nosep]
-\item \textbf{Random policy:} uniform random actions (5K traj/task)
-\item \textbf{Scripted exploration:} approach but don't complete (5K/task)
-\item \textbf{Noisy oracle:} oracle + heavy noise $\sigma{=}0.3$ (5K/task)
-\item \textbf{Mixed:} equal blend (15K total/task)
-\item \textbf{Tasks:} Push-to-Target, Pick\&Place, Stack, Peg-Insert, Drawer-Open, Button-Press
-\item Also: LIBERO-10 (random policy failures), CALVIN (random play as failures)
-\end{itemize}
-
-\subsection{Baselines (8)}
-\begin{enumerate}[nosep]
-\item BC with $N$ successful demos: $N \in \{1, 5, 10, 25, 50, 100\}$ --- \textbf{critical comparison}
-\item BC with 0 demos (random policy, lower bound)
-\item Dreamer-v3 from scratch (online RL from exploration)
-\item HER (Hindsight Experience Replay)
-\item Plan2Explore $\to$ fine-tune
-\item Random augmentation (perturb failures, no world model)
-\item DAgger (sim oracle corrections)
-\item Zero-Success without near-success filtering (imagine from ALL states)
-\end{enumerate}
-
-\subsection{Key Experiment: Learning Curve}
-\begin{equation}
-\text{X-axis: } N_{\text{successful demos}} \in \{0, 1, 5, 10, 25, 50, 100\}, \quad \text{Y-axis: success rate (\%)}
-\end{equation}
-
-Plot for: Zero-Success (ours at $N{=}0$), BC, Dreamer-v3, HER, DAgger. Evaluate on ManiSkill3 (6 tasks) + LIBERO-10 + CALVIN. \textbf{Expected:} Zero-Success (0 demos) $\approx$ BC with 25 demos.
-
-\subsection{Other Experiments}
-(1) Failure data composition (random vs.\ scripted vs.\ noisy-oracle). (2) Near-success statistics (fraction of failures with near-success states). (3) WM quality from failures vs.\ successes. (4) Imagination quality visualization. (5) Scaling failure data $\{1\text{K}{-}50\text{K}\}$.
-
-\subsection{Ablations (8)}
-(1) Threshold $\tau$: $\{0.5{-}0.9\}$. (2) Horizon $H$: $\{3,5,10,20\}$. (3) Search: random/CEM/MPPI. (4) Completions per near-success: $\{1,5,10,50\}$. (5) WM arch: RSSM/Transformer/diffusion. (6) Proximity function: LPIPS/SSIM/learned/object distance. (7) Failure type. (8) Iterative refinement: 1--3 rounds.
-
-\subsection{Risk Mitigation}
-If $N{=}0$ produces $<$50\% success, relax to ``Few-Success'' ($N{=}1{-}5$ demos + failure data). Contribution becomes: ``failures multiply demo value by 10$\times$.''
-
-\newpage
-%=====================================================================
-\section{Hardware \& Execution Plan}
-\label{sec:hardware}
-%=====================================================================
-
-\textbf{Compute:} 48 H200 GPUs (6 nodes $\times$ 8 GPUs, nodes NOT interconnected).
-
-\subsection{Parallel PoC (Weeks 1--3)}
-\begin{table}[h]
-\centering
-\begin{tabular}{cll}
-\toprule
-\textbf{Nodes} & \textbf{Idea} & \textbf{PoC Target} \\
-\midrule
-1--2 & DynaCLIP & Contrastive pre-training + probing results \\
-3--4 & PhysBridge & Physics FM adaptation + data efficiency curve \\
-5--6 & PhysSteering & SAE on reproduction model + physics features \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Double Down (Weeks 4--6)}
-Allocate all 6 nodes to whichever PoC shows strongest initial results. Start PhysContext or Zero-Success in parallel if compute allows.
-
-\subsection{Full Paper (Weeks 7--12)}
-Complete experiments, all baselines, all ablations, analysis, paper writing.
-
-\vspace{10pt}
-\noindent\textbf{All experiments are sim-only.} Benchmarks: LIBERO (10 + Long), CALVIN ABC-D, ManiSkill3 (with physics variation), RLBench-18. No real robot required. NeurIPS viability ensured by: (a) multiple diverse sim benchmarks, (b) cross-simulator transfer, (c) thorough ablations, (d) fundamental scientific contributions (not engineering).
+The key experiment is the N-Success Learning Curve: plot success rate on the Y-axis versus number of successful demonstrations on the X-axis from 0 to 100 for all methods, showing that Zero-Success at N=0 achieves approximately 75\% success matching BC at N=25 demos. Evaluate on ManiSkill3 all 6 tasks plus LIBERO-10 plus CALVIN with 100 episodes times 3 seeds. Run additional experiments: failure data composition comparing random versus scripted versus noisy-oracle versus mixed, near-success statistics reporting what fraction of failures have near-success states at various thresholds and how far in timesteps they are from actual success, world model quality comparison between training on failures only versus successes only versus mixed, imagination quality visualization showing physical plausibility and goal achievement rate, and scaling failure data at 1K, 5K, 15K, and 50K trajectories per task. Run 8 ablations: (1) near-success threshold tau from 0.5 to 0.9, (2) imagination horizon H at 3, 5, 10, 20 steps, (3) search method comparing random at N=256, 1024, 4096 versus CEM versus MPPI, (4) number of imagined completions per near-success state at 1, 5, 10, 50, (5) world model architecture comparing RSSM versus Transformer versus diffusion-based, (6) goal proximity function comparing LPIPS versus SSIM versus learned MLP versus object distance, (7) failure data quality comparing random versus scripted versus noisy-oracle versus mixed, and (8) iterative refinement with 1 versus 2 versus 3 rounds of retraining the world model on synthetic data then generating more. If Zero-Success at N=0 produces less than 50\% success, pivot the framing to Few-Success Learning showing that 5 demos plus failure data matches 50 demos of BC alone, with the contribution being that failures multiply demonstration value by 10 times.
 
 \end{document}
