@@ -1,6 +1,8 @@
 # Top 5 Oral-Level Ideas for NeurIPS 2026
 
-*Cycle 4 (final). Verified against 200+ papers across 4 iteration cycles. Updated with DreamZero, PhysiX, Walrus, GPhyT, Physics-IQ, and all March 2026 papers.*
+*Cycle 4 FINAL UPDATE. Verified against 200+ papers across 4 iteration cycles. Updated with DALI (NeurIPS 2025) overlap analysis for PhysContext.*
+
+> **⚠️ DALI UPDATE (2508.20294):** PhysContext's novelty reduced from 9→7 due to DALI (NeurIPS 2025) doing context-conditioned world model adaptation without gradients on manipulation. DynaCLIP returns to #1 as the ONLY idea with no close competitor after exhaustive search.
 
 ---
 
@@ -154,10 +156,10 @@
 
 | Rank | Idea | Oral | Key Selling Point |
 |------|------|:---:|---|
-| **1** | **PhysContext** | **9/10** | "One interaction is all you need" — GPT-moment for robot physics |
-| **2** | **DynaCLIP** | **8/10** | "CLIP for physics" — new representation paradigm |
-| **3** | **PhysBridge** | **8/10** | "Physics-first beats video-first" — would redirect the field |
-| **4** | **PhysSteering** | **8/10** | "Physics neurons in DreamZero" — mechanistic interpretability for robots |
+| **1** | **DynaCLIP** | **8/10** | "CLIP for physics" — new representation paradigm, NO close competitor |
+| **2** | **PhysBridge** | **8/10** | "Physics-first beats video-first" — would redirect the field |
+| **3** | **PhysSteering** | **8/10** | "Physics neurons in DreamZero" — mechanistic interpretability for robots |
+| **4** | **PhysContext** | **7/10** ↓ | DALI overlap. Differentiate via compositional transfer + diagnostic protocol |
 | **5** | **Zero-Success** | **7-9/10** | "Zero demonstrations needed" — most shocking if it works |
 
 ### What Changed from Cycle 3
