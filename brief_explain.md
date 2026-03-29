@@ -1,6 +1,6 @@
-# 今日最佳10篇论文深度解析
+# 每日最佳论文深度解析
 
-*2026年3月28日 — 从50篇论文中筛选出最具价值的10篇*
+*2026年3月28-29日*
 
 ---
 
@@ -485,3 +485,103 @@ while True:
 | **SSM可能取代Transformer** | Mamba-3 | 复数状态+MIMO=更适合物理动力学建模 |
 | **量化有数学上的最优解** | LLVQ | Leech格是24维最优球填充，直接当码本用 |
 | **Agent RL基础设施成熟** | ProRL Agent | 异步rollout-as-a-service是production标准 |
+
+---
+---
+
+# 3月29日新增：5篇重要论文深度解析
+
+---
+
+## 21. Fast-WAM：测试时视频想象其实不需要
+
+**arXiv:** [2603.16666](https://arxiv.org/abs/2603.16666)
+
+**核心思想：** 所有World Action Model（DreamZero、Cosmos Policy）都在测试时做视频想象——预测未来视频帧来辅助动作决策。Fast-WAM做了一个反直觉的实验：去掉测试时的视频生成，只保留训练时的视频预测作为辅助任务。结果：性能几乎不降！这说明视频建模的价值在于训练时学到的表示，而不是测试时生成的视频。
+
+**新颖性：** 这直接挑战了DreamZero的核心假设——"测试时想象未来很重要"。Fast-WAM证明视频生成是一个优秀的**训练信号**（帮助学习好的视觉-动态表示），但在测试时是多余的计算开销。这和"知识蒸馏"的逻辑类似——teacher model在训练时有用，推理时不需要。
+
+**核心代码思路：**
+- 训练时：视频预测头 + 动作预测头联合训练（和DreamZero相同）
+- 测试时：只用动作预测头，完全跳过视频生成（比DreamZero快很多）
+- 关键发现：视频预测头的gradient帮助backbone学到了更好的时空表示
+- 消融：去掉训练时的视频头→性能大幅下降；去掉测试时的视频生成→性能不降
+
+**对我们有价值的部分：** 对PhysBridge和PhysContext极其重要。如果测试时不需要视频想象，那我们的世界模型可以只在训练时使用物理预测作为辅助任务，测试时直接用学到的表示做决策。这能大幅提高推理速度，同时保持物理感知能力。
+
+---
+
+## 22. Qwen3-Coder-Next：80B开源Coding Agent
+
+**arXiv:** [2603.00729](https://arxiv.org/abs/2603.00729)
+
+**核心思想：** 阿里开源的80B MoE coding agent（只激活3B参数），用agentic RL训练——不是让模型做单次代码生成，而是让它在真实coding环境中反复交互（写代码→运行→看报错→修改→再运行），用环境反馈作为RL奖励。这是第一个用真实代码执行结果作为online RL奖励的开源大模型。
+
+**新颖性：** 之前的coding model（DeepSeek-Coder、CodeLlama）都是用SFT训练的——在固定数据集上学"什么样的代码是好的"。Qwen3-Coder-Next用的是agentic RL——模型在sandbox中执行代码，通过是否通过测试、编译是否成功等信号自我改进。这就像AlphaGo的self-play但用在代码生成上。
+
+**核心代码思路：**
+- 架构：80B MoE（32个expert，每次激活4个≈3B）
+- RL环境：Docker sandbox执行代码，返回stdout/stderr/test_results
+- Reward：编译通过(+0.1)、测试通过(+0.5/test)、代码质量(linter score)
+- 训练：GRPO on multi-turn trajectories（多轮交互，不是单次生成）
+- 关键：persistent interpreter state——模型的前一轮修改保留到下一轮
+
+**对我们有价值的部分：** Qwen3-Coder-Next可以直接作为我们的coding agent来实现DynaCLIP等项目。80B模型但只激活3B，推理成本低。开源意味着可以本地部署。agentic RL的训练范式也可以用于我们的实验——让模型自动调试和优化训练代码。
+
+---
+
+## 23. ARRoL：在线剪枝让GRPO训练加速1.7倍
+
+**arXiv:** [2603.24840](https://arxiv.org/abs/2603.24840)
+
+**核心思想：** GRPO（Group Relative Policy Optimization）是当前RL for LLM的主流方法（DeepSeek-R1就用它）。但它很浪费——每个prompt生成多个rollout，大部分rollout要么全对要么全错，对学习没有信息量。ARRoL在生成**过程中**就剪枝：一旦检测到rollout已经"没救了"（错误不可挽回）或者"已经确定对了"（不需要再继续），立刻停止生成。节省的算力重新分配给新的rollout。
+
+**新颖性：** 之前的方法是先生成所有rollout，再筛选有用的（offline filtering）。ARRoL是**online pruning**——在生成token的过程中实时判断是否值得继续。这需要一个轻量级的"进度预测器"来估计当前rollout的最终结果。关键创新：不需要训练额外模型，直接用LLM自身的perplexity变化趋势来预测——如果perplexity突然升高说明模型"卡住了"，应该剪枝。
+
+**核心代码思路：**
+- 标准GRPO：为每个prompt生成K=16个rollout，全部完成后计算reward
+- ARRoL：生成过程中监控每个rollout的"活力指标"
+- 活力指标 = f(perplexity趋势, 已生成长度, 当前token概率)
+- 如果活力 < 阈值 → 杀掉这个rollout，释放GPU给新rollout
+- 结果：+2.30-2.99准确率提升 + 1.7x训练加速
+
+**对我们有价值的部分：** 如果我们用RL训练世界模型（PhysBridge的LoRA微调、Zero-Success的imagination搜索），ARRoL的在线剪枝可以直接应用——在世界模型rollout中，一旦预测的轨迹明显不合理（物理违规），立即终止并重新采样。节省大量无效计算。
+
+---
+
+## 24. Multi-Agent Scaling Laws：LLM群体的共识形成
+
+**arXiv:** [2603.24676](https://arxiv.org/abs/2603.24676)
+
+**核心思想：** 当多个LLM agent合作完成任务时，它们的"集体智慧"如何随agent数量扩展？这篇论文推导了LLM群体达成共识的scaling law，发现存在两种regime：（1）drift-dominated（随机漂移主导，agent数量增加不帮忙），（2）selection-dominated（选择压力主导，更多agent=更好结果）。关键因素是每个agent回复的"fitness variance"——如果回复质量差异大，更多agent帮助大；如果回复都差不多，更多agent没用。
+
+**新颖性：** 之前的multi-agent研究是经验性的——"3个agent比1个好，5个比3个好"。这篇论文提供了**理论框架**（借用群体遗传学的数学工具），预测什么条件下增加agent有用，什么条件下纯粹浪费算力。这是multi-agent LLM系统的第一个scaling law。
+
+**核心代码思路：**
+- 类比：LLM agent群体 ≈ 进化种群
+- 每个agent的回复 = 一个个体的"基因型"
+- 共识机制（投票/讨论/聚合）= 选择压力
+- 推导：有效群体大小 N_e = f(N_agents, fitness_variance, drift_rate)
+- 当 N_e * selection_coefficient > 1 → selection-dominated → 更多agent有用
+- 当 N_e * selection_coefficient < 1 → drift-dominated → 更多agent没用
+
+**对我们有价值的部分：** 如果我们用multi-agent方式运行实验（多个agent并行尝试不同实验配置），这个scaling law告诉我们应该部署多少个agent。对于高variance任务（探索性实验），多agent有帮助；对于低variance任务（标准训练），少agent就够了。
+
+---
+
+## 25. SafeMath：安全对齐居然能提高数学准确率
+
+**arXiv:** [2603.25201](https://arxiv.org/abs/2603.25201)
+
+**核心思想：** 学界普遍认为安全对齐（RLHF/DPO用于减少有害输出）会损害模型的推理能力——所谓的"alignment tax"。SafeMath用ToxicGSM数据集（1.9K对抗性数学题，答案中嵌入有害内容）证明：安全对齐不仅不损害数学推理，反而**提高**了准确率。原因：安全对齐教会模型拒绝"看起来合理但实际有害/错误"的推理路径，这种能力泛化到了拒绝"看起来合理但数学错误"的推理路径。
+
+**新颖性：** 完全反直觉。所有之前的工作都报告alignment tax——安全对齐后数学/编码能力下降。SafeMath发现这是因为之前的安全数据集太简单（只有"拒绝有害请求"，没有"在推理过程中识别嵌入的有害内容"）。当安全任务需要深度推理（在数学推导中发现嵌入的有害内容），安全训练和推理训练是互相增强的。
+
+**核心代码思路：**
+- ToxicGSM数据集：标准GSM8K数学题，但答案中嵌入了有害内容
+- 模型需要同时：正确解题 + 识别并拒绝有害内容
+- 训练：DPO，positive = 正确解题且拒绝有害；negative = 接受有害或解题错误
+- 发现：DPO后的模型在标准GSM8K上也提高了（无有害内容的纯数学题）
+- 机制：安全训练增强了"区分表面合理vs真正正确"的能力
+
+**对我们有价值的部分：** 这对PhysSteering和PhysBridge的启发：物理对齐训练（用DPO让世界模型拒绝物理不合理的预测）可能不仅不损害预测能力，反而提高准确率——因为学会拒绝"看起来合理但物理错误"的预测泛化到了拒绝所有类型的错误预测。ABot-PhysWorld的DPO物理对齐可能比想象中更有价值。
