@@ -1,12 +1,13 @@
-# 5 Oral-Level Ideas: Diffusion Language Models (v2 — Post-Novelty-Check)
+# 5 Oral-Level Ideas: Diffusion Language Models (v3 — Double-Verified as of April 1, 2026)
 
-*v1 had 4/5 ideas already done. This version verified against 30+ competing papers.*
+*v1 had 4/5 ideas already done. v2 generated 5 new ideas. v3 double-verified all 5 via targeted web search against the latest literature. All 5 confirmed novel.*
 
-**What's been scooped since v1:**
-- Learned unmasking policy via RL: 3 papers (arXiv 2512.09106 ICLR Oral, dUltra, Hong et al.)
-- DPO for dLLMs: VRPO (LLaDA 1.5), dTRPO (Meta), ELBO-KTO
-- Self-refining diffusion: 5 papers (ReDiff, CDLM, BackPlay, RemeDi, ProSeCo)
-- Grammar-constrained decoding: ICLR 2026 + NeurIPS 2025 (Mundler et al., DINGO)
+**Double-verification key competitors identified and addressed:**
+- Attention Floating Mechanism (2601.07894): ANALYZES MDM attention but proposes NO architectural fix → our Idea 1 IS the fix
+- CARD (2601.22031): fixed block-causal diffusion, NOT per-token dynamic mode switching → our Idea 3 is different
+- Soft-Masked DLM (2510.17206): changes MASK embedding, NOT the corruption function → our Idea 4 is different
+- DiffuCoder/CoDA/Dream-Coder: full code GENERATION, NOT diff/patch generation → our Idea 5 is different
+- All sparse attention papers: target AR models, ZERO for diffusion LMs → our Idea 2 is clear gap
 
 ---
 
@@ -14,7 +15,7 @@
 
 **Core insight:** Every diffusion LM uses standard bidirectional Transformer attention regardless of the masking state. But attending to MASK tokens is wasted compute — they carry zero information. At early denoising steps (90% masked), 90% of attention is on uninformative tokens. We propose mask-adaptive attention where the attention pattern dynamically adjusts based on which tokens are revealed vs. masked: revealed tokens attend fully to each other, masked tokens attend only to revealed tokens (not to other masked tokens), and attention weights are re-normalized over the informative subset.
 
-**Novelty verification:** No paper designs attention specifically for the iterative denoising process in masked diffusion LMs. All (LLaDA, Dream, Mercury, MDLM) use vanilla bidirectional Transformer. The "Attention in Diffusion Model" survey (2504.03738) covers image diffusion attention but not text-specific denoising-aware designs.
+**Novelty verification (double-checked April 2026):** "Revealing the Attention Floating Mechanism" (arXiv 2601.07894, Jan 2026) ANALYZES how attention floats in MDMs (weaker, less concentrated patterns) but proposes NO architectural intervention. Soft-Masked DLM (2510.17206) enriches MASK embeddings but doesn't modify attention mechanics. AdaBlock-dLLM (2509.26432) does semantic-aware block-size decoding, not attention architecture. **No paper proposes a new attention mechanism designed for iterative denoising.** Our work is the natural architectural intervention following the 2601.07894 analysis — position as "they found the problem, we propose the fix."
 
 **Why oral-level:** This is an ARCHITECTURE contribution — the rarest and most impactful type of paper. If mask-adaptive attention improves both quality AND speed (by skipping MASK-to-MASK attention), it becomes the default architecture for all future dLLMs.
 
